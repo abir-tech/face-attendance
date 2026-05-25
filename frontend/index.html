@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI One-Shot Facial Attendance System</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f7fafc;
+            margin: 0;
+            padding: 30px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        header {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        h1 {
+            color: #1a202c;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            color: #718096;
+            margin: 0;
+        }
+        /* Live Logs Grid Layout Table */
+        .logs-section {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .logs-section h2 {
+            margin-top: 0;
+            color: #2d3748;
+            font-size: 1.25rem;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #edf2f7;
+            padding-bottom: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+        th, td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #edf2f7;
+        }
+        th {
+            background-color: #f8fafc;
+            color: #4a5568;
+            font-weight: 600;
+        }
+        tr:hover {
+            background-color: #f8fafc;
+        }
+        .badge {
+            background-color: #c6f6d5;
+            color: #22543d;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>AI One-Shot Facial Attendance Dashboard</h1>
+            <p class="subtitle">Real-time local computer vision recognition and biometrics logging</p>
+        </header>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+            
+            <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center;">
+                <h2 style="margin-top: 0; color: #2d3748; font-size: 1.25rem; margin-bottom: 15px;">Live Facial Scanner</h2>
+                <div style="position: relative; width: 100%; max-width: 400px; margin: 0 auto; background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 4/3;">
+                    <video id="webcam" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
+                    <canvas id="capture-canvas" style="display: none;"></canvas>
+                </div>
+                <button id="scan-btn" style="margin-top: 15px; width: 100%; max-width: 400px; padding: 12px; background: #3182ce; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: background 0.2s;">
+                    Scan My Face
+                </button>
+                <div id="scan-status" style="margin-top: 10px; font-weight: 500; color: #718096;">Camera initializing...</div>
+            </div>
+
+            <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: center;">
+                <h2 style="margin-top: 0; color: #2d3748; font-size: 1.25rem; margin-bottom: 15px;">Register New User Profile</h2>
+                <p style="color: #718096; font-size: 0.9rem; margin-bottom: 20px;">Align your face in the webcam stream on the left, type your name below, and click register to save your profile into the AI database.</p>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #4a5568;">Full Name:</label>
+                    <input type="text" id="reg-name" placeholder="" style="width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; box-sizing: border-box; font-size: 1rem;">
+                </div>
+                
+                <button id="register-btn" style="width: 100%; padding: 12px; background: #38a169; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: background 0.2s;">
+                    Take Snapshot & Register Face
+                </button>
+                <div id="reg-status" style="margin-top: 10px; font-weight: 500; text-align: center; color: #718096;"></div>
+            </div>
+        </div>
+
+        <div class="logs-section">
+            <h2>Live Attendance Logs</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Employee/User Name</th>
+                        <th>Timestamp</th>
+                        <th>Status Verification</th>
+                    </tr>
+                </thead>
+                <tbody id="logs-table-body">
+                    <tr>
+                        <td colspan="3" style="text-align: center; color: #a0aec0; padding: 30px;">Syncing with network server logs...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // --- WEBCAM INITIALIZATION SYSTEM ---
+        async function setupWebcam() {
+            const video = document.getElementById('webcam');
+            const scanStatus = document.getElementById('scan-status');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+                video.srcObject = stream;
+                scanStatus.innerText = "System Ready for Scanning & Registration";
+                scanStatus.style.color = "#4a5568";
+            } catch (err) {
+                console.error("Webcam blocked or not found:", err);
+                scanStatus.innerText = "❌ Error: Webcam access denied or unavailable.";
+                scanStatus.style.color = "#e53e3e";
+            }
+        }
+
+        // --- FACE SCAN RECOGNITION INTERACTION ---
+        document.getElementById('scan-btn').addEventListener('click', async () => {
+            const scanStatus = document.getElementById('scan-status');
+            const video = document.getElementById('webcam');
+            const canvas = document.getElementById('capture-canvas');
+
+            scanStatus.innerText = "Analyzing facial features...";
+            scanStatus.style.color = "#3182ce";
+
+            // Draw current video frame to hidden canvas element
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Compress matrix into image blob and post payload data package over network
+            canvas.toBlob(async (blob) => {
+                const formData = new FormData();
+                formData.append('image', blob, 'scan.jpg');
+
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/api/scan-face/', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        // FIX: Added bulletproof variable keys checking to eliminate 'undefined' names
+                        const identifiedName = result.user || result.username || result.name || "Verified User";
+                        scanStatus.innerText = `✅ Welcome back, ${identifiedName}! Logged successfully.`;
+                        scanStatus.style.color = "#38a169";
+                        fetchLogs(); // Instantly update logs table view layout grid
+                    } else {
+                        scanStatus.innerText = `❌ Access Denied: ${result.error || 'Face Not Recognized'}`;
+                        scanStatus.style.color = "#e53e3e";
+                    }
+                } catch (error) {
+                    scanStatus.innerText = "❌ Network error connecting to AI server.";
+                    scanStatus.style.color = "#e53e3e";
+                }
+            }, 'image/jpeg', 0.95);
+        });
+
+        // --- PROFILE REGISTRATION INTERACTION ---
+        document.getElementById('register-btn').addEventListener('click', async () => {
+            const nameInput = document.getElementById('reg-name');
+            const name = nameInput.value.trim();
+            const regStatus = document.getElementById('reg-status');
+            const video = document.getElementById('webcam');
+            const canvas = document.getElementById('capture-canvas');
+
+            if (!name) {
+                regStatus.innerText = "⚠️ Please enter a name before registering!";
+                regStatus.style.color = "#e53e3e";
+                return;
+            }
+
+            regStatus.innerText = "Capturing facial biometric vector...";
+            regStatus.style.color = "#3182ce";
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            canvas.toBlob(async (blob) => {
+                const formData = new FormData();
+                formData.append('name', name);
+                formData.append('image', blob, 'registration_capture.jpg');
+
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/api/register-face/', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        regStatus.innerText = `✅ Successfully registered: ${name}!`;
+                        regStatus.style.color = "#38a169";
+                        nameInput.value = ""; // Reset name text area box empty
+                    } else {
+                        regStatus.innerText = `❌ Registration Failed: ${result.error || 'Server Error'}`;
+                        regStatus.style.color = "#e53e3e";
+                    }
+                } catch (error) {
+                    regStatus.innerText = "❌ Network connection error to backend server.";
+                    regStatus.style.color = "#e53e3e";
+                }
+            }, 'image/jpeg', 0.95);
+        });
+
+        // --- HISTORICAL LOGS NETWORK FETCH SYNC PIPELINE ---
+        async function fetchLogs() {
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/attendance-history/');
+                const data = await response.json();
+                const tbody = document.getElementById('logs-table-body');
+                
+                if (data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #a0aec0; padding: 30px;">No attendance logs filed yet today.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = data.map(log => {
+                    const localTime = new Date(log.timestamp).toLocaleString();
+                    return `
+                        <tr>
+                            <td style="font-weight: 600; color: #2d3748;">${log.user_name}</td>
+                            <td style="color: #4a5568;">${localTime}</td>
+                            <td><span class="badge">Verified Present</span></td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (err) {
+                console.error("Logs sync failed:", err);
+            }
+        }
+
+        // Run functions immediately on boot lifecycle start up
+        setupWebcam();
+        fetchLogs();
+        setInterval(fetchLogs, 5000); // Continuous update engine sweep loop cycle hook pulse every 5 seconds
+    </script>
+</body>
+</html>
